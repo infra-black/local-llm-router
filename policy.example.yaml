@@ -7,9 +7,21 @@ backends:
     type: sarmalink
     endpoint: https://api.sarmalink.ai/v1
     model: smart
+  # API key in named env var
+  azure-oai:
+    type: openai
+    endpoint: https://myresource.openai.azure.com/openai/deployments/gpt-4o
+    model: gpt-4o
+    api_key_env: MY_AZURE_KEY
+  # API key set in config (dangerous)
   frontier:
     type: openai
     endpoint: https://api.openai.com/v1
+    model: gpt-4o
+    api_key: sk-proj-XXXXXXXXXXXXXXXX
+  # API key vars unset - falls back to OPENAI_API_KEY env var
+  vanilla:
+    type: openai
     model: gpt-4o
 
 routes:
