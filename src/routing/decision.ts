@@ -3,19 +3,19 @@ import type { Policy } from '../config/loader.js'
 
 export interface Decision {
   backend: string
-  fallback?: string
+  fallbackChain: string[]
   reason: string
 }
 
 export function decide(c: Classification, policy: Policy): Decision {
   for (const route of policy.routes) {
     if ('default' in route) {
-      return { backend: route.default, fallback: route.fallback, reason: 'default' }
+      return { backend: route.default, fallbackChain: route.fallbackChain, reason: 'default' }
     }
     if (matches(c, route.match)) {
       return {
         backend: route.backend,
-        fallback: route.fallback,
+        fallbackChain: route.fallbackChain,
         reason: route.reason || `matched: ${JSON.stringify(route.match)}`,
       }
     }

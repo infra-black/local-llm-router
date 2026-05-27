@@ -9,14 +9,17 @@ db.exec(`
     latency_ms INTEGER NOT NULL,
     ok INTEGER NOT NULL,
     error TEXT,
-    fallback_for TEXT
+    fallback_for TEXT,
+    hop INTEGER
   );
   CREATE INDEX IF NOT EXISTS idx_metrics_backend ON metrics(backend);
   CREATE INDEX IF NOT EXISTS idx_metrics_ts ON metrics(ts DESC);
 `)
 
+try { db.exec('ALTER TABLE metrics ADD COLUMN hop INTEGER') } catch (_) {}
+
 const insert = db.prepare(
-  'INSERT INTO metrics (backend, latency_ms, ok, error, fallback_for) VALUES (?, ?, ?, ?, ?)',
+  'INSERT INTO metrics (backend, latency_ms, ok, error, fallback_for, hop) VALUES (?, ?, ?, ?, ?, ?)',
 )
 
 export interface MetricEvent {
@@ -25,6 +28,7 @@ export interface MetricEvent {
   ok: boolean
   error?: string
   fallbackFor?: string
+  hop?: number
 }
 
 export function record(event: MetricEvent) {
@@ -34,6 +38,7 @@ export function record(event: MetricEvent) {
     event.ok ? 1 : 0,
     event.error || null,
     event.fallbackFor || null,
+    event.hop ?? 0,
   )
 }
 

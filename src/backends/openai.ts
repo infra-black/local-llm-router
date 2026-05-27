@@ -27,7 +27,7 @@ export async function runOpenAI(config: any, body: any): Promise<any> {
 
   // Emit warnings
   for (const w of warnings) {
-    console.warn(`[local-llm-router] ${w}`)
+    console.warn(`[lllm-rt] ${w}`)
   }
 
   // No key? Cry about it.
