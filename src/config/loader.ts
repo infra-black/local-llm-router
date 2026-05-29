@@ -2,10 +2,35 @@ import { readFileSync } from 'fs'
 import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
 
+export const HealthCheckSchema = z.object({
+  path: z.string().default('/v1/models'),
+  interval_seconds: z.number().positive().default(30),
+  timeout_seconds: z.number().positive().default(5),
+  unhealthy_threshold: z.number().int().positive().default(2),
+  healthy_threshold: z.number().int().positive().default(1),
+})
+
+export type HealthCheckConfig = z.infer<typeof HealthCheckSchema>
+
 export const BackendSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('ollama'), endpoint: z.string(), models: z.array(z.string()).optional() }),
-  z.object({ type: z.literal('sarmalink'), endpoint: z.string(), model: z.string().default('smart') }),
-  z.object({ type: z.literal('openai'), endpoint: z.string().default('https://api.openai.com/v1'), model: z.string() }),
+  z.object({
+    type: z.literal('ollama'),
+    endpoint: z.string(),
+    models: z.array(z.string()).optional(),
+    health_check: HealthCheckSchema.optional(),
+  }),
+  z.object({
+    type: z.literal('sarmalink'),
+    endpoint: z.string(),
+    model: z.string().default('smart'),
+    health_check: HealthCheckSchema.optional(),
+  }),
+  z.object({
+    type: z.literal('openai'),
+    endpoint: z.string().default('https://api.openai.com/v1'),
+    model: z.string(),
+    health_check: HealthCheckSchema.optional(),
+  }),
 ])
 
 export const RouteSchema = z.union([
