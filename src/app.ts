@@ -4,6 +4,7 @@ import { decide } from './routing/decision.js'
 import { classify } from './routing/classifier.js'
 import { runBackend } from './backends/registry.js'
 import { record } from './metrics/collector.js'
+import { HealthChecker } from './health/checkup.js'
 
 function isRetryable(err: any): boolean {
   if (err?.code === 'ETIMEDOUT' || err?.code === 'ECONNREFUSED') return true
@@ -12,11 +13,25 @@ function isRetryable(err: any): boolean {
   return false
 }
 
-export function createApp(policyPath: string = process.env.LLR_POLICY || './policy.yaml') {
+export async function createApp(policyPath: string = process.env.LLR_POLICY || './policy.yaml') {
   const app = new Hono()
   const policy = loadPolicy(policyPath)
+  const health = new HealthChecker(policy)
+
+  // wait for health checks to resolve on startup
+  await health.start()
 
   app.get('/health', (c) => c.json({ ok: true, version: '1.0.0', backends: Object.keys(policy.backends) }))
+
+  // backend health states
+  app.get('/v1/health', (c) => {
+    const states = health.getAllStates()
+    const out: Record<string, string> = {}
+    for (const [name, state] of Object.entries(states)) {
+      out[name] = state === 'UNKNOWN' ? 'unknown' : state.toLowerCase()
+    }
+    return c.json(out)
+  })
 
   app.get('/v1/models', (c) =>
     c.json({
@@ -33,9 +48,14 @@ export function createApp(policyPath: string = process.env.LLR_POLICY || './poli
     const body = await c.req.json()
     const sensitivity = c.req.header('x-llr-sensitivity') || 'normal'
     const classification = classify(body, sensitivity)
-    const decision = decide(classification, policy)
+    const decision = decide(classification, policy, health)
     const chain = [decision.backend, ...decision.fallbackChain]
     const start = Date.now()
+
+    // short-circuit if all backends are unhealthy
+    if (!decision.backend) {
+      return c.json({ error: { message: decision.reason, code: 'no_healthy_backend' } }, 503)
+    }
 
     let lastError: any
 

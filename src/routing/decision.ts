@@ -1,6 +1,6 @@
 import type { Classification } from './classifier.js'
 import type { Policy } from '../config/loader.js'
-import type { HealthChecker } from '../health/checker.js'
+import type { HealthChecker } from '../health/checkup.js'
 
 export interface Decision {
   backend: string
@@ -38,7 +38,7 @@ function resolveChain(primary: string, fallbackChain: string[], reason: string, 
 
   if (chain.length === 0) {
     return {
-      backend: primary,
+      backend: '',
       fallbackChain: [],
       reason: `${reason} (all backends unhealthy!)`,
     }

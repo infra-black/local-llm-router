@@ -3,6 +3,24 @@ import type { Decision } from './routing/decision.js'
 
 // --- Mocks ---
 
+const mockHealthStart = vi.fn().mockResolvedValue(undefined)
+const mockHealthGetAllStates = vi.fn().mockReturnValue({
+  local: 'HEALTHY',
+  sarmalink: 'HEALTHY',
+  frontier: 'HEALTHY',
+})
+const mockHealthGetState = vi.fn().mockReturnValue('HEALTHY')
+
+vi.mock('./health/checkup.js', () => ({
+  HealthChecker: vi.fn(() => ({
+    start: mockHealthStart,
+    getAllStates: mockHealthGetAllStates,
+    getState: mockHealthGetState,
+    onTransition: vi.fn(),
+    stop: vi.fn(),
+  })),
+}))
+
 vi.mock('./config/loader.js', () => ({
   loadPolicy: () => ({
     backends: {
@@ -59,9 +77,16 @@ function httpError(status: number, message: string) {
 describe('app', () => {
   let app: ReturnType<typeof createApp>['app']
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
-    const created = createApp()
+    mockHealthStart.mockResolvedValue(undefined)
+    mockHealthGetAllStates.mockReturnValue({
+      local: 'HEALTHY',
+      sarmalink: 'HEALTHY',
+      frontier: 'HEALTHY',
+    })
+    mockHealthGetState.mockReturnValue('HEALTHY')
+    const created = await createApp()
     app = created.app
   })
 
@@ -88,7 +113,34 @@ describe('app', () => {
     })
   })
 
+  describe('GET /v1/health', () => {
+    it('returns health status of all backends', async () => {
+      mockHealthGetAllStates.mockReturnValue({
+        local: 'HEALTHY',
+        sarmalink: 'UNHEALTHY',
+        frontier: 'HEALTHY',
+      })
+      const res = await app.fetch(new Request('http://localhost/v1/health'))
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body).toEqual({ local: 'healthy', sarmalink: 'unhealthy', frontier: 'healthy' })
+    })
+  })
+
   describe('POST /v1/chat/completions', () => {
+    it('returns 503 when all backends are unhealthy', async () => {
+      mockDecide.mockReturnValue({
+        backend: '',
+        fallbackChain: [],
+        reason: 'matched (all backends unhealthy: local, sarmalink, frontier)',
+      })
+
+      const res = await postCompletions(app)
+      expect(res.status).toBe(503)
+      const body = await res.json()
+      expect(body.error.code).toBe('no_healthy_backend')
+    })
+
     it('returns result when primary backend succeeds', async () => {
       mockDecide.mockReturnValue({ backend: 'local', fallbackChain: ['sarmalink'], reason: 'matched' })
       mockRunBackend.mockResolvedValue({ choices: [] })
