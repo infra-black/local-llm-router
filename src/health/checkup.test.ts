@@ -185,7 +185,7 @@ describe('HealthChecker', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       await checker.start()
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Backend 'local' transitioned: UNKNOWN -> HEALTHY"),
+        expect.stringContaining("[lllm-rt] Health state of backend 'local' transitioned: UNKNOWN -> HEALTHY"),
       )
       warnSpy.mockRestore()
     })
