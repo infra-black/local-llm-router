@@ -6,23 +6,24 @@ export interface Decision {
   backend: string
   fallbackChain: string[]
   reason: string
+  classification: Classification
 }
 
-export function decide(c: Classification, policy: Policy, health?: HealthChecker): Decision {
+export function decide(cls: Classification, policy: Policy, health?: HealthChecker): Decision {
   for (const route of policy.routes) {
     if ('default' in route) {
-      return resolveChain(route.default, route.fallbackChain, 'default', health)
+      return resolveChain(route.default, route.fallbackChain, 'default', cls, health)
     }
-    if (matches(c, route.match)) {
+    if (matches(cls, route.match)) {
       const reason = route.reason || `matched: ${JSON.stringify(route.match)}`
-      return resolveChain(route.backend, route.fallbackChain, reason, health)
+      return resolveChain(route.backend, route.fallbackChain, reason, cls, health)
     }
   }
   // Should not reach here if policy has a default
   throw new Error('No route matched and no default backend in policy')
 }
 
-function resolveChain(primary: string, fallbackChain: string[], reason: string, health?: HealthChecker): Decision {
+function resolveChain(primary: string, fallbackChain: string[], reason: string, cls: Classification, health?: HealthChecker): Decision {
   const chain = [primary, ...fallbackChain]
   const skipped: string[] = []
 
@@ -41,6 +42,7 @@ function resolveChain(primary: string, fallbackChain: string[], reason: string, 
       backend: '',
       fallbackChain: [],
       reason: `${reason} (all backends unhealthy!)`,
+      classification: cls
     }
   }
 
@@ -50,12 +52,21 @@ function resolveChain(primary: string, fallbackChain: string[], reason: string, 
     reason: skipped.length > 0
       ? `${reason} (skipped unhealthy: ${skipped.join(', ')})`
       : reason,
+    classification: cls
   }
 }
 
-function matches(c: Classification, criteria: Record<string, any>): boolean {
+function matches(cls: Classification, criteria: Record<string, any>): boolean {
   for (const [k, v] of Object.entries(criteria)) {
-    if ((c as any)[k] !== v) return false
+    if (k === 'modalities') {
+      // Subset match: every required modality must be present in classification
+      if (!Array.isArray(v)) return false
+      for (const required of v) {
+        if (!cls.modalities.includes(required)) return false
+      }
+    } else {
+      if ((cls as any)[k] !== v) return false
+    }
   }
   return true
 }
