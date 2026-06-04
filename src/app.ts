@@ -47,14 +47,26 @@ export async function createApp(policyPath: string = process.env.LLR_POLICY || '
   app.post('/v1/chat/completions', async (c) => {
     const body = await c.req.json()
     const sensitivity = c.req.header('x-llr-sensitivity') || 'normal'
-    const classification = classify(body, sensitivity)
-    const decision = decide(classification, policy, health)
+    const cls = classify(body, sensitivity)
+    const decision = decide(cls, policy, health)
     const chain = [decision.backend, ...decision.fallbackChain]
     const start = Date.now()
 
-    // short-circuit if all backends are unhealthy
+    // short-circuit if all backends are unhealthy or no route can serve this modality
     if (!decision.backend) {
-      return c.json({ error: { message: decision.reason, code: 'no_healthy_backend' } }, 503)
+      const healthyBackends = Object.keys(policy.backends).filter(
+        (name) => health.getState(name) !== 'UNHEALTHY',
+      )
+      return c.json(
+        {
+          error: {
+            type: 'upstream_unavailable',
+            message: `No backend available for this request (modalities=[${cls.modalities.join(', ')}], healthy_backends=[${healthyBackends.join(', ')}])`,
+            code: 503,
+          },
+        },
+        503,
+      )
     }
 
     let lastError: any
