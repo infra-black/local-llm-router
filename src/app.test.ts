@@ -33,6 +33,7 @@ vi.mock('./config/loader.js', () => ({
 
 vi.mock('./routing/classifier.js', () => ({
   classify: vi.fn(() => ({ task: 'code', complexity: 'low', sensitivity: 'normal' })),
+  modalities: ['text']
 }))
 
 const mockDecide = vi.fn()
@@ -132,13 +133,22 @@ describe('app', () => {
       mockDecide.mockReturnValue({
         backend: '',
         fallbackChain: [],
-        reason: 'matched (all backends unhealthy: local, sarmalink, frontier)',
+        reason: 'matched (all backends unhealthy!)',
+        classification: {
+          task: 'code',
+          complexity: 'low',
+          sensitivity: 'normal',
+          modalities: ['text'],
+        }
       })
 
       const res = await postCompletions(app)
       expect(res.status).toBe(503)
       const body = await res.json()
-      expect(body.error.code).toBe('no_healthy_backend')
+      expect(body.error.type).toBe('upstream_unavailable')
+      expect(body.error.code).toBe(503)
+      expect(body.error.message).toContain('modalities=[text]')
+      expect(body.error.message).toContain('healthy_backends=')
     })
 
     it('returns result when primary backend succeeds', async () => {
