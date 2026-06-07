@@ -32,8 +32,7 @@ vi.mock('./config/loader.js', () => ({
 }))
 
 vi.mock('./routing/classifier.js', () => ({
-  classify: vi.fn(() => ({ task: 'code', complexity: 'low', sensitivity: 'normal' })),
-  modalities: ['text']
+  classify: vi.fn(() => ({ task: 'code', complexity: 'low', sensitivity: 'normal', modalities: ['text'] }))
 }))
 
 const mockDecide = vi.fn()
